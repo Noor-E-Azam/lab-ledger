@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>EnviSci Lab Ledger</title>
+<meta name="description" content="Shared lab logbook for the Department of Environmental Science" />
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#3F5D44" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Lab Ledger" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- First-run / switch profile overlay -->
+<div id="profile-overlay" class="overlay hidden">
+  <div class="stamp-card profile-card">
+    <p class="eyebrow">Field Registration</p>
+    <h1 class="stamp-title">Who's checking in?</h1>
+    <p class="muted">Your name identifies you when you open, hand over, or close a lab on this device.</p>
+
+    <label class="field-label" for="profile-name-input">Your name</label>
+    <input id="profile-name-input" type="text" placeholder="e.g. Ananya Roy" autocomplete="off" />
+    <button id="profile-create-btn" class="btn btn-primary">Register this device</button>
+
+    <div id="profile-existing-wrap" class="existing-wrap hidden">
+      <p class="muted small">Already registered? Select your name instead:</p>
+      <select id="profile-existing-select"></select>
+      <button id="profile-use-existing-btn" class="btn btn-secondary">Use this profile</button>
+    </div>
+
+    <p id="profile-error" class="error-text hidden"></p>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">🧪</span>
+      <div>
+        <p class="brand-title">EnviSci Lab Ledger</p>
+        <p class="brand-sub">Dept. of Environmental Science</p>
+      </div>
+    </div>
+    <button id="whoami-btn" class="whoami" title="Switch profile">
+      <span id="whoami-name">—</span>
+    </button>
+  </header>
+
+  <main class="views">
+
+    <!-- HOME -->
+    <section id="view-home" class="view">
+      <p class="eyebrow">Field Status</p>
+      <h2 class="view-title">Lab Ledger</h2>
+      <div id="home-list" class="stamp-grid"></div>
+    </section>
+
+    <!-- OPEN -->
+    <section id="view-open" class="view hidden">
+      <p class="eyebrow">Entry</p>
+      <h2 class="view-title">Open a lab</h2>
+      <p class="muted">Opening as <strong id="open-as-name">—</strong>. Pick a closed lab below.</p>
+      <div id="open-list" class="option-list"></div>
+      <p id="open-empty" class="empty-state hidden">All labs are currently open.</p>
+    </section>
+
+    <!-- HANDOVER -->
+    <section id="view-handover" class="view hidden">
+      <p class="eyebrow">Transfer</p>
+      <h2 class="view-title">Hand over charge</h2>
+      <p class="muted">You can hand over labs currently held by <strong id="handover-as-name">—</strong>.</p>
+      <div id="handover-list" class="option-list"></div>
+      <p id="handover-empty" class="empty-state hidden">You are not currently holding any lab.</p>
+    </section>
+
+    <!-- CLOSE -->
+    <section id="view-close" class="view hidden">
+      <p class="eyebrow">Exit</p>
+      <h2 class="view-title">Close a lab</h2>
+      <p class="muted">Closing as <strong id="close-as-name">—</strong>. Pick an open lab below.</p>
+      <div id="close-list" class="option-list"></div>
+      <p id="close-empty" class="empty-state hidden">No labs are currently open.</p>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="view-history" class="view hidden">
+      <p class="eyebrow">Ledger</p>
+      <h2 class="view-title">Activity log</h2>
+      <select id="history-filter">
+        <option value="All Labs">All labs</option>
+      </select>
+      <div id="history-list" class="log-list"></div>
+      <p id="history-empty" class="empty-state hidden">No entries yet.</p>
+    </section>
+
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab-btn active" data-view="home"><span class="tab-icon">⌂</span><span>Home</span></button>
+    <button class="tab-btn" data-view="open"><span class="tab-icon">🔓</span><span>Open</span></button>
+    <button class="tab-btn" data-view="handover"><span class="tab-icon">⇄</span><span>Handover</span></button>
+    <button class="tab-btn" data-view="close"><span class="tab-icon">🔒</span><span>Close</span></button>
+    <button class="tab-btn" data-view="history"><span class="tab-icon">≡</span><span>History</span></button>
+  </nav>
+
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="app.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
