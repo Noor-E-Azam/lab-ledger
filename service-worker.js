@@ -51,8 +51,7 @@ firebase.initializeApp({
   projectId: "envisci-lab-ledger",
   storageBucket: "envisci-lab-ledger.firebasestorage.app",
   messagingSenderId: "959150686537",
-  appId: "1:959150686537:web:8f2ce463338862b9c81a98",
-  measurementId: "G-VBLM65ZP8F"
+  appId: "1:959150686537:web:8f2ce463338862b9c81a98"
 });
 
 const messaging = firebase.messaging();
