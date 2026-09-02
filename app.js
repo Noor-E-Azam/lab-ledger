@@ -1,27 +1,40 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc,
-  onSnapshot, query, orderBy, limit
+  getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
+  onSnapshot, query, orderBy, limit, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
+import {
+  getMessaging, getToken, onMessage, isSupported as isMessagingSupported
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging.js";
+import { firebaseConfig, vapidKey } from "./firebase-config.js";
 
 /* ---------------- Firebase setup ---------------- */
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 const LABS = ["Lab11", "Lab1", "Lab2", "MB Lab"];
 const studentsCol = collection(db, "students");
 const labStatusCol = collection(db, "labStatus");
 const labLogsCol = collection(db, "labLogs");
+const adminsRef = doc(db, "config", "admins");
 
 /* ---------------- Local state ---------------- */
 const NAME_KEY = "labledger_myname";
 let myName = localStorage.getItem(NAME_KEY) || null;
+let currentUid = null;
 
-let labStatusData = {};   // { labName: {status, currentHolder, openedBy, openedAt, lastUpdated} }
-let studentsData = [];    // [name, ...]
-let logsData = [];        // [{labName, action, studentName, relatedStudent, timestamp}]
+let labStatusData = {};     // { labName: {...} }
+let studentsFull = [];      // [{id, name, uid, createdAt}]
+let studentsData = [];      // [name, ...] sorted, derived from studentsFull
+let logsData = [];          // [{labName, action, studentName, relatedStudent, timestamp}]
+let adminsUids = [];        // [uid, ...]
 let handoverSelection = {}; // { labName: selectedTargetName }
+
+function isAdmin() {
+  return !!currentUid && adminsUids.includes(currentUid);
+}
 
 /* ---------------- Helpers ---------------- */
 function nowStr() {
@@ -36,7 +49,7 @@ function esc(str) {
   return div.innerHTML;
 }
 
-function showToast(msg, ms = 2600) {
+function showToast(msg, ms = 2800) {
   const el = document.getElementById("toast");
   el.textContent = msg;
   el.classList.remove("hidden");
@@ -51,26 +64,32 @@ async function seedLabs() {
     const snap = await getDoc(ref);
     if (!snap.exists()) {
       await setDoc(ref, {
-        status: "Closed",
-        currentHolder: null,
-        openedBy: null,
-        openedAt: null,
-        lastUpdated: nowStr()
+        status: "Closed", currentHolder: null, openedBy: null, openedAt: null, lastUpdated: nowStr()
       });
     }
   }
 }
 
-/* ---------------- Firestore actions ---------------- */
+/* ---------------- Profile actions ---------------- */
 async function registerNewProfile(name) {
   name = name.trim();
   if (!name) return { ok: false, msg: "Please enter your name." };
   const exists = studentsData.some((s) => s.toLowerCase() === name.toLowerCase());
   if (exists) return { ok: false, msg: `"${name}" is already registered. Use "Select existing name" below.` };
-  await addDoc(studentsCol, { name, createdAt: nowStr() });
+  await addDoc(studentsCol, { name, createdAt: nowStr(), uid: currentUid || null });
   return { ok: true };
 }
 
+async function claimExistingProfile(name) {
+  const student = studentsFull.find((s) => s.name === name);
+  if (student) {
+    try { await updateDoc(doc(studentsCol, student.id), { uid: currentUid }); } catch (e) { console.error(e); }
+  }
+  myName = name;
+  localStorage.setItem(NAME_KEY, name);
+}
+
+/* ---------------- Lab actions ---------------- */
 async function openLabAction(labName) {
   const status = labStatusData[labName];
   if (!status || status.status === "Open") {
@@ -114,12 +133,78 @@ async function closeLabAction(labName) {
   showToast(`${labName} closed.`);
 }
 
+/* ---------------- Admin actions ---------------- */
+async function promoteAdmin(uid) {
+  if (!uid) { showToast("This student has no linked device yet."); return; }
+  try {
+    await updateDoc(adminsRef, { uids: arrayUnion(uid) });
+    showToast("Admin access granted.");
+  } catch (e) {
+    showToast("Couldn't grant admin: " + e.message);
+  }
+}
+
+async function demoteAdmin(uid) {
+  if (adminsUids.length <= 1) { showToast("At least one admin must remain."); return; }
+  try {
+    await updateDoc(adminsRef, { uids: arrayRemove(uid) });
+    showToast("Admin access revoked.");
+  } catch (e) {
+    showToast("Couldn't revoke admin: " + e.message);
+  }
+}
+
+async function removeStudent(studentDocId, studentUid, studentName) {
+  if (!confirm(`Remove ${studentName}'s profile? This can't be undone.`)) return;
+  try {
+    if (studentUid && adminsUids.includes(studentUid)) {
+      await updateDoc(adminsRef, { uids: arrayRemove(studentUid) });
+    }
+    await deleteDoc(doc(studentsCol, studentDocId));
+    showToast(`${studentName} removed.`);
+  } catch (e) {
+    showToast("Couldn't remove: " + e.message);
+  }
+}
+
+/* ---------------- Notifications ---------------- */
+async function enableNotifications() {
+  try {
+    if (!("Notification" in window)) { showToast("Notifications aren't supported on this browser."); return; }
+    const supported = await isMessagingSupported();
+    if (!supported) { showToast("Push isn't supported on this browser/device."); return; }
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { showToast("Notification permission denied."); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const messaging = getMessaging(app);
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg });
+    if (!token) { showToast("Couldn't get a notification token."); return; }
+    await setDoc(doc(db, "pushTokens", currentUid), { token, name: myName, updatedAt: nowStr() });
+    showToast("Lab alerts enabled on this device.");
+  } catch (e) {
+    console.error(e);
+    showToast("Couldn't enable alerts: " + e.message);
+  }
+}
+
+function attachForegroundMessaging() {
+  isMessagingSupported().then((ok) => {
+    if (!ok) return;
+    const messaging = getMessaging(app);
+    onMessage(messaging, (payload) => {
+      showToast(payload.notification?.body || "Lab alert received.");
+    });
+  }).catch(() => {});
+}
+
 /* ---------------- Rendering ---------------- */
 function renderWhoAmI() {
   document.getElementById("whoami-name").textContent = myName || "—";
   document.getElementById("open-as-name").textContent = myName || "—";
   document.getElementById("handover-as-name").textContent = myName || "—";
   document.getElementById("close-as-name").textContent = myName || "—";
+  document.getElementById("settings-name").textContent = myName || "—";
+  document.getElementById("settings-role").textContent = isAdmin() ? "Admin" : "Member";
 }
 
 function renderHome() {
@@ -222,6 +307,34 @@ function renderHistory() {
   `).join("");
 }
 
+function renderSettings() {
+  document.getElementById("device-id-value").textContent = currentUid || "…";
+
+  const adminSection = document.getElementById("admin-people-section");
+  if (!isAdmin()) { adminSection.classList.add("hidden"); return; }
+  adminSection.classList.remove("hidden");
+
+  document.getElementById("admin-people-list").innerHTML = studentsFull.map((s) => {
+    const admin = !!(s.uid && adminsUids.includes(s.uid));
+    const roleBtn = admin
+      ? `<button class="btn btn-secondary" data-action="demote" data-uid="${esc(s.uid)}">Revoke admin</button>`
+      : s.uid
+        ? `<button class="btn btn-secondary" data-action="promote" data-uid="${esc(s.uid)}">Make admin</button>`
+        : `<button class="btn btn-secondary" disabled title="No device linked yet">Make admin</button>`;
+    return `
+      <div class="admin-row">
+        <div>
+          <div class="option-name">${esc(s.name)}</div>
+          <div class="option-sub">${admin ? "Admin" : "Member"}${s.uid ? "" : " · no device linked"}</div>
+        </div>
+        <div class="admin-row-actions">
+          ${roleBtn}
+          <button class="btn btn-danger" data-action="remove-student" data-id="${esc(s.id)}" data-uid="${esc(s.uid || "")}" data-name="${esc(s.name)}">Remove</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
 function renderAll() {
   renderWhoAmI();
   renderHome();
@@ -229,6 +342,7 @@ function renderAll() {
   renderHandoverView();
   renderCloseView();
   renderHistory();
+  renderSettings();
 }
 
 /* ---------------- Real-time listeners ---------------- */
@@ -241,7 +355,8 @@ function attachListeners() {
   });
 
   onSnapshot(studentsCol, (snap) => {
-    studentsData = snap.docs.map((d) => d.data().name).sort((a, b) => a.localeCompare(b));
+    studentsFull = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    studentsData = studentsFull.map((s) => s.name).sort((a, b) => a.localeCompare(b));
     renderExistingProfileSelect();
     renderAll();
   });
@@ -250,6 +365,13 @@ function attachListeners() {
   onSnapshot(logsQuery, (snap) => {
     logsData = snap.docs.map((d) => d.data());
     renderHistory();
+  });
+}
+
+function attachAdminsListener() {
+  onSnapshot(adminsRef, (snap) => {
+    adminsUids = snap.exists() ? (snap.data().uids || []) : [];
+    renderAll();
   });
 }
 
@@ -294,10 +416,9 @@ function initProfileOverlay() {
     renderAll();
   });
 
-  useExistingBtn.addEventListener("click", () => {
+  useExistingBtn.addEventListener("click", async () => {
     if (!existingSelect.value) return;
-    myName = existingSelect.value;
-    localStorage.setItem(NAME_KEY, myName);
+    await claimExistingProfile(existingSelect.value);
     hideProfileOverlay();
     renderAll();
   });
@@ -319,24 +440,29 @@ function initTabs() {
 function initActionDelegation() {
   document.addEventListener("click", (e) => {
     const el = e.target.closest("[data-action]");
-    if (!el) return;
+    if (!el || el.disabled) return;
     const action = el.dataset.action;
     const lab = el.dataset.lab;
 
     if (action === "open") openLabAction(lab);
     if (action === "close") closeLabAction(lab);
-    if (action === "pick") {
-      handoverSelection[lab] = el.dataset.student;
-      renderHandoverView();
-    }
+    if (action === "pick") { handoverSelection[lab] = el.dataset.student; renderHandoverView(); }
     if (action === "handover") handoverLabAction(lab, handoverSelection[lab]);
+    if (action === "promote") promoteAdmin(el.dataset.uid);
+    if (action === "demote") demoteAdmin(el.dataset.uid);
+    if (action === "remove-student") removeStudent(el.dataset.id, el.dataset.uid, el.dataset.name);
   });
 
-  document.getElementById("whoami-btn").addEventListener("click", () => {
-    showProfileOverlay();
-  });
-
+  document.getElementById("whoami-btn").addEventListener("click", () => showProfileOverlay());
   document.getElementById("history-filter").addEventListener("change", renderHistory);
+}
+
+function initSettingsHandlers() {
+  document.getElementById("copy-device-id-btn").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(currentUid || ""); showToast("Device ID copied."); }
+    catch { showToast(currentUid || "Couldn't copy."); }
+  });
+  document.getElementById("enable-notif-btn").addEventListener("click", enableNotifications);
 }
 
 function populateHistoryFilterOptions() {
@@ -351,15 +477,21 @@ async function boot() {
   initTabs();
   initActionDelegation();
   initProfileOverlay();
+  initSettingsHandlers();
+
+  await new Promise((resolve) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) { currentUid = user.uid; unsub(); resolve(); }
+    });
+    signInAnonymously(auth).catch((e) => { console.error(e); resolve(); });
+  });
 
   await seedLabs();
   attachListeners();
+  attachAdminsListener();
+  attachForegroundMessaging();
 
-  if (myName) {
-    hideProfileOverlay();
-  } else {
-    showProfileOverlay();
-  }
+  if (myName) hideProfileOverlay(); else showProfileOverlay();
 }
 
 boot();

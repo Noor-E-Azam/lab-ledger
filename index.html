@@ -106,6 +106,34 @@
       <p id="history-empty" class="empty-state hidden">No entries yet.</p>
     </section>
 
+    <!-- SETTINGS / ADMIN -->
+    <section id="view-settings" class="view hidden">
+      <p class="eyebrow">Account</p>
+      <h2 class="view-title">Admin &amp; alerts</h2>
+
+      <div class="stamp-card">
+        <p class="lab-meta">Signed in as <b id="settings-name">—</b> · <span id="settings-role">Member</span></p>
+        <p class="field-label" style="margin-top:14px;">Device ID</p>
+        <div class="device-id-row">
+          <code id="device-id-value">…</code>
+          <button id="copy-device-id-btn" class="btn btn-secondary">Copy</button>
+        </div>
+        <p class="muted small" style="margin-top:8px;">Share this with the app owner to be granted admin access (see README, Part 4).</p>
+      </div>
+
+      <div class="stamp-card" style="margin-top:14px;">
+        <p class="lab-name" style="margin-bottom:4px;">Lab alerts</p>
+        <p class="muted small">Get notified on this device if a lab is still open at 8 PM.</p>
+        <button id="enable-notif-btn" class="btn btn-primary btn-block">Enable lab alerts on this device</button>
+      </div>
+
+      <div id="admin-people-section" class="hidden" style="margin-top:18px;">
+        <p class="eyebrow">Admin Panel</p>
+        <h3 class="view-title" style="font-size:18px;">Manage students</h3>
+        <div id="admin-people-list" class="option-list"></div>
+      </div>
+    </section>
+
   </main>
 
   <nav class="tabbar">
@@ -114,6 +142,7 @@
     <button class="tab-btn" data-view="handover"><span class="tab-icon">⇄</span><span>Handover</span></button>
     <button class="tab-btn" data-view="close"><span class="tab-icon">🔒</span><span>Close</span></button>
     <button class="tab-btn" data-view="history"><span class="tab-icon">≡</span><span>History</span></button>
+    <button class="tab-btn" data-view="settings"><span class="tab-icon">⚙</span><span>Admin</span></button>
   </nav>
 
 </div>

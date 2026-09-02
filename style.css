@@ -279,6 +279,37 @@ button, input, select {
 .log-body .log-lab { font-weight: 600; }
 .log-body .log-time { color: var(--muted); font-size: 11.5px; font-family: var(--font-display); }
 
+/* ---------- Settings / Admin ---------- */
+.device-id-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+#device-id-value {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  background: var(--paper);
+  border: 1px dashed var(--line);
+  padding: 10px 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.admin-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.admin-row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-row-actions .btn { flex: 1; min-width: 118px; padding: 9px 10px; font-size: 11px; }
+
 /* ---------- Bottom tab bar ---------- */
 .tabbar {
   position: fixed;

@@ -9,3 +9,7 @@ export const firebaseConfig = {
   appId: "1:959150686537:web:8f2ce463338862b9c81a98",
   measurementId: "G-VBLM65ZP8F"
 };
+
+// From Firebase Console → Project settings → Cloud Messaging tab → Web Push certificates
+// → "Generate key pair". See README.md Part 5.
+export const vapidKey = "PASTE_YOUR_VAPID_KEY";

@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // True only for devices whose auth uid is listed in config/admins.uids
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/config/admins)
+        && request.auth.uid in get(/databases/$(database)/documents/config/admins).data.uids;
+    }
+
+    match /students/{studentId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();   // any signed-in device can update (e.g. re-claim a name);
+                                        // this does NOT grant admin rights, see /config/admins below
+      allow delete: if isAdmin();      // only admins can remove a student profile
+    }
+
+    match /labStatus/{labId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /labLogs/{logId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false; // logs are permanent, nobody can edit history
+    }
+
+    // The admin allow-list. Only admins can add/remove admins.
+    // NOTE: the very first admin document must be created manually via the
+    // Firebase Console (Console access bypasses these rules) — see README.md Part 4.
+    match /config/admins {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Push notification tokens: a device may only write its own token, and
+    // nobody can read others' tokens from the client (the notification
+    // scheduler reads them via the Admin SDK, which bypasses these rules).
+    match /pushTokens/{tokenId} {
+      allow read: if false;
+      allow create, update: if isSignedIn() && request.auth.uid == tokenId;
+      allow delete: if isSignedIn() && request.auth.uid == tokenId;
+    }
+  }
+}

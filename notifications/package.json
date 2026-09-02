@@ -1,0 +1,10 @@
+{
+  "name": "lab-ledger-notifications",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Scheduled 8 PM open-lab check for the EnviSci Lab Ledger app",
+  "main": "send-alerts.js",
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
