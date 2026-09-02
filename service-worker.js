@@ -46,12 +46,13 @@ importScripts("https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-com
 
 // Paste the SAME values you put in firebase-config.js. See README.md Part 5.
 firebase.initializeApp({
-  apiKey: "PASTE_YOUR_API_KEY",
-  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID"
+  apiKey: "AIzaSyDbBjP5MozgaZ61G1tg8gO-nv22A3drzpk",
+  authDomain: "envisci-lab-ledger.firebaseapp.com",
+  projectId: "envisci-lab-ledger",
+  storageBucket: "envisci-lab-ledger.firebasestorage.app",
+  messagingSenderId: "959150686537",
+  appId: "1:959150686537:web:8f2ce463338862b9c81a98",
+  measurementId: "G-VBLM65ZP8F"
 });
 
 const messaging = firebase.messaging();
